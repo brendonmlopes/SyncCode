@@ -1,39 +1,65 @@
 #include <stdio.h>
 
-int main() {
-  FILE *file = fopen("dados.txt", "r");
-  FILE *output = fopen("dados_formatados.csv", "w");
+int main(void) {
+    FILE *file   = fopen("dados.txt", "r");
+    FILE *output = fopen("dados_formatados.csv", "w");
+    if (!file || !output) {
+        printf("Erro ao abrir arquivo(s).\n");
+        if (file) fclose(file);
+        if (output) fclose(output);
+        return 1;
+    }
 
-  if (file == NULL) {
-    printf("Erro ao abrir o arquivo.\n");
-    return 1;
-  }
+    int c;
+    int comma_count = 0;
+    int skipping = 0;
 
-  for(char c = fgetc(file); c != EOF; c = fgetc(file)) {
-    if (c == ',') {
-      fputc('.', output);
-    } else if (c == ' ') {
-      char next = fgetc(file);
-      if (next == ' ') {
-        fputc(',', output);
-      } else {
-        fputc(c, output);
-        if (next != EOF) {
-          fputc(next, output);
+    while ((c = fgetc(file)) != EOF) {
+        if (c == '\r') continue; // normaliza CRLF
+
+        if (c == '\n') {
+            fputc('\n', output);
+            comma_count = 0;
+            skipping = 0;
+            continue;
         }
-      }
-    } else {
-      fputc(c, output);
+
+        if (skipping) {
+            continue;
+        }
+
+        if (c == ',') {
+            c = '.';
+            fputc(c, output);
+            continue;
+        }
+
+        if (c == ' ') {
+            int space_count = 1;
+            int next;
+            while ((next = fgetc(file)) == ' ') {
+                space_count++;
+            }
+            if (next != EOF) ungetc(next, file);
+
+            if (space_count >= 2) {
+                if (comma_count < 3) {
+                    fputc(',', output);
+                    comma_count++;
+                } else {
+                    skipping = 1;
+                }
+            } else {
+                fputc(' ', output);
+            }
+            continue;
+        }
+
+        fputc(c, output);
     }
-  }
-  // save the output only with the columns 1,2,3 and 4
-  for (int i = 0; i < 4; i++) {
-    char buffer[256];
-    if (fgets(buffer, sizeof(buffer), output) != NULL) {
-      fputs(buffer, stdout);
-    }
-  }
-  fclose(output);
-  fclose(file);
-  return 0;
+
+    fclose(file);
+    fclose(output);
+    return 0;
 }
+
